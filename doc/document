@@ -1,0 +1,291 @@
+                   
+
+Internet Protocols
+Project Documentation
+Group Echo
+File transfer
+7.4.2016
+
+Nicholas Kukka 218070
+Samu Toimela 224103
+Eino Virtanen 296665
+
+Table of contents
+
+Overview and overall architecture
+Requirements description
+Instructions
+Communication protocol
+Implementation description
+Testing
+Known defects and shortcomings
+Division of work
+References
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+1. Overview and overall architecture
+
+    The clients connect to a primary port, after which the client prints the possible options 
+    for the user to choose from. The software offers options for client to server and vice versa 
+    transactions and they can be performed in either TCP or UDP, as well as the client can request a listing of the files on the server. After the user selects an appropriate option, the selection is sent to the server and the server chooses an unused port to be used and performs a fork in order to create a child process that communicates with the client.
+Now the user specifies a filename which is checked for validity. If the filename is valid, 
+transaction commences. After the transaction is complete, the client and the server child process exits.
+
+
+2. Requirements description
+
+    The file transfer software is implemented for Linux systems using C. Both the client and server 
+    communicates in both UDP and TCP. The server generates new processes for TCP and UDP connections
+     used for file transfers when needed. The software utilizes both ipv4 and ipv6. The software is 
+     used through Linux terminal. The user will have the option to either request a file list or proceed
+      to download or upload files using either UDP or TCP. No libraries apart from the ones distributed
+       with default Debian distributions are needed.
+    The software is split into two executable binaries, server and client. The server needs no further
+     attention after being run, while the client requires the obvious user input. If TCP is utilized
+      to transfer files, then the client starts listening to incoming data after receiving an initial
+       filename acknowledgement from the server. Then the server uses functions tcpget() and tcpsend()
+        specified in tcp.c. If UDP is used, the client needs to call the function udpsendcli() specified
+         in udpsendcli.c after it receives the port designated by the server. At this time the server
+          calls udpsend() specified in udpsend.c. No matter if the direction is from the server to client or vice versa, the same functions are applied.
+    The server also manages the used ports with a linked list specified in portlist.c. This is performed 
+    the same way no matter what transfer protocol is used.
+
+
+3. Instructions
+
+    Using the software doesn't require any libraries that are not shipped with the default Debian packages. 
+    In order to use/test the software, the user must pull it from the git repository and then use the makefile
+     to compile it using the following commands:
+
+    git clone <git address>
+    cd echo/src/
+    make
+    
+    After building the software, no additional configuration is needed. To start up the system, the user must
+     run server.o on the server machine, and client.o on the client. The server will start listening to incoming
+      connections after starting and needs no further user attention. The client on the other hand asks for a 
+      server ip and prints out a list of available commands as follows:
+
+    IP address to be connected to: <user input: server IP>
+    1: FILELIST
+    2: TCPSEND
+    3: UDPSEND
+    4: TCPGET
+    5: UDPGET
+    Give command number: <user input: number>
+
+The client will prompt for a option until a proper one is selected.
+
+If a TCP transmission is selected, the client prompts for a filename:
+
+==TCP SEND/GET==
+Server wants connection to port: 49155
+port int is 49155
+Connected
+Give filename to upload/download: <user input: filename>
+
+Now the transmission will begin:
+
+Sending filename to the server…
+Uploading file. Please wait…
+End of file reached
+File uploaded successfully (29 bytes)
+Closing client
+
+In case the filename is invalid the client prints out the following instead and exits:
+
+    Couldn't open the file.
+Closing client
+
+If UDPSEND is selected, the client will require some configuration and also prompt for a filename until a valid one is defined:
+
+    Starting UDP sending.
+Time to wait between packets (ms)? (recommended values: 10 wired, 100 mobile)
+<user input: wait(ms)>
+How many times a packet is sent? (recommended values: 2 wired, 3 mobile)
+<user input: number of times to send>
+Name of file to send?
+<user input: filename>
+Sending filename <filename> to server.
+Starting transmission.
+File sent successfully!
+Closing client
+
+If UDPGET is selected, the client will prompt for a filename as follows:
+
+==UDP GET==
+got port 49159
+Name of file to download?
+<user input: filename>
+Sending filename 100k to server.
+Opening file and starting file transfer.
+It's possible to get stuck here, if file isn't found on server. Use tcp if unsure about file existence
+File received successfully. Killing process.
+Closing client
+
+
+4. Communication protocol
+
+    Figure 1 shows the communication protocol between the client and the server. First, the connection to the server is opened.
+     Then the server forks it's process in order to support multiple connections. Then the server waits for the menu option 
+     from the client, and finally after the server has received information about the desired operation it sends the client
+      a list of files or a designated port number to be used in the file transfer. Now the client sends the server a filename
+       which is then replied to with an acknowledgement from the server if GET functions are used. After this the transfer
+        commences and after it the client closes the socket and exits, while the server child process also closes sockets and terminates.    
+
+
+Figure 1. Communication protocol
+
+Figure 2 shows the protocol that we invented for UDP. The forked child process queries the user for the two variables, 
+which define how many times each payload is sent and how often. Our empirical findings were that around 10ms were good 
+for wired connections which had smallish variance, and 100ms for mobile networks which have higher variance in round 
+trip times. The resend variables purpose is to combat packet loss. One can calculate from the probability of packet
+ loss and from the amount of packets to be sent, what is a good value value for it for a given P(X) probability of
+  a file transfer success. Again we found empirically that with wired networks around 2 retransmits and for wireless,
+   around 3 retransmits are suitable values.
+
+
+
+
+Figure 2. UDP file transfer protocol diagram
+
+
+5. Implementation description
+
+    The system consists of two software modules, the client and the server. The server listens to incoming connections
+     from clients and creates separate child processes and manages used ports for different users. The client is used 
+     to connect to the server to request file listings and download and upload files from and to the server.
+    The server requires no user input after being ran. The client on the other hand receives user input through the 
+    Linux terminal. The input requirements are simple: the user either chooses to get a listing of files or selects
+     a desired file transfer method. After selecting a transfer method (and configuring the UDP settings if needed), 
+     the client also prompts the user for a filename.
+    No other C libraries are used apart from the ones that are distributed with regular Debian distributions. The most 
+    familiar libraries used were <stdio.h> <string.h> <unistd.h> <stdlib.h> <sys/uio.h> <sys/types.h>. The networking 
+    related libraries were <arpa/inet.h> <netinet.in.h> <netdb.h> and <sys/socket.h>. Library <linux/limits.h> was used 
+    to get the exact size for the filename buffer, because it contains the maximum filename size that the compiling 
+    operating system uses. The <dirent.h> has functions to list files in a directory, which were used for the servers
+     filelisting functions. For the slight adjustments in the UDP transmission speeds, the <time.h> was used. It is 
+     recommended in newer POSIX standards and can be used to define waits up to the precision of milliseconds, but
+      we only required precision of some milliseconds or tens of milliseconds, so this one suited us well.
+
+
+6. Testing
+    The software has been tested with Mininet using the course-provided custom topologies: latency, slow, buffers and lossy.
+    Transfers using the TCP protocol work almost flawlessly, apart from occasional problems with the buffers topology. This
+     is also when multiple clients are connected at once. However, UDP transfers did not work at all at first, since a bug
+      allowed only transactions through localhost ip. This was diagnosed using Wireshark on the Mininet interfaces, so that
+       it could be seen that no packets are delivered at all. This way, the bug was much easier to fix.
+Our softwares memory usage is quite optimal. The sizes of the buffers could be slightly smaller, but at the moment our 
+software uses only a few megabytes of memory, which is by today’s standards very efficient. Valgrind does not show any 
+memory leakages and our software is very robust in a sense that the processes which use buffers, are child processes that the
+ main process kills, and the underlying operation system automatically of course frees the memory of killed processes.
+
+
+7. Known defects and other shortcomings
+
+With both UDP and TCP functions, the file transfer may run into some problems with highly crippled network scenarios.
+UDP retransmissions could have had more automation in them. We looked up to the mosh-protocol, which was invented in the
+ Massachusetts Institute of Technology (MIT). It makes the usage of SSH more robust and easier to use via UDP. Mosh has 
+ multiple of functions to measure the quality of the connection and uses these measurements to adjust the connection. 
+ Our protocol is very basic in a sense that it prompts the user and suggests values for the retransmit and timebetweenpackages values.
+    If this project was to be continued to a more advanced project, there could be a continuous daemon that measures at
+     least the variance and the packet loss of the connection and adjusts the connection values according to them.
+    Another way to get the most throughput via UDP would be to transmit bursts of packets and analyze later, which 
+    packets did not arrive. The optimal ways to achieve good throughput via bad connections have been researched but
+     for example in rural Finland, there could be more more research and theories done.
+The initially planned features that were not implemented include authentication to the server with separate storages
+ for all users and MD5 hash checks for files transmitted. Also, the client, server and TCP architectures should have
+  been implemented with better programming standards in mind. Debugging in these parts of the program was extremely 
+  tedious, since the program structure was not split into a larger amount of functions.
+
+
+8. Distribution of work
+
+The Group and the division of work:
+
+        Nicholas Kukka
+            Integration of features
+Implementation of some TCP features
+            Testing
+            Documentation
+
+        Samu Toimela
+            Client and server architectural design
+            Most of TCP features
+            Multiprocessing
+
+        Eino Virtanen
+            Full implementation of UDP file transfer protocol and architecture
+Local file handling
+Testing
+Some documentation
+
+Meetings with full group:
+
+1st meeting
+        -28.2. at Maarintalo
+        -Setting up Git and discussing different C libraries.
+        -Initial workload division was discussed.
+
+2nd meeting
+        - 7.3. at Otakaari 5
+        - Discussed libraries and multiprocessing with the assistant
+
+3rd meeting
+        - 18.3. at Maarintalo
+        - Documentation and planning for future work.
+
+4th meeting
+        - 25.3. at Maarintalo
+        - Recap of work done and planning
+5th meeting 
+        - 4.4. at Otakaari 18
+        - Bugfixes and general integration of features
+6th meeting
+        - 6.4. at Otakaari 5
+        - Discussed final keypoints with the assistant
+
+
+9. References
+
+Linux Manual Pages
+http://linux.die.net/man/
+C manual 
+http://www.gnu.org/software/gnu-c-manual/gnu-c-manual.html
+Mininet instructions 
+https://github.com/PasiSa/mininet
+Mosh protocol
+https://mosh.mit.edu/

@@ -1,0 +1,85 @@
+---CLIENT---
+connect(server_ip, port)
+
+commands:
+
+FILELIST
+	receive filelist
+
+TCPGET filename.txt
+	listen server IP & port
+	connect
+	send "READY"
+	receive file
+	close connection
+
+UDPGET filename.txt
+	listen server IP & port
+	connect
+	send READY
+	receive file
+	close connection
+
+TCPSEND	filename.txt
+	listen server IP & port
+	connect
+	listen "READY"
+	send file
+	listen "OK"
+	close connection
+
+UDPSEND filename.txt
+	listen server IP & port
+	connect
+	listen "READY"
+	send file
+	listen "OK"
+	close connection
+
+
+---SERVER---
+listen()
+bind()
+read(connfd, buffer, sizeof(buffer))
+
+command = strtok(buffer, " ")
+
+if (!strcmp(command, "FILELIST")){
+	send_file_list()
+}
+
+else if (!strcmp(command, "TCPGET")){
+	filename = strtok(NULL, " ")
+	if filename in filelist:
+		start_tcp_server()
+		send_file_tcp(filename)
+	else{
+		printf("no such file\n");
+	}
+}
+	
+else if (!strcmp(command, "UDPGET")){
+	filename = strtok(NULL, " ")
+	if filename in filelist:
+		start_udp_server(filename)
+		send_file_udp(filename)
+	else {
+		printf("no such file\n");
+	}
+}
+	
+else if (!strcmp(command, "TCPSEND")){
+	filename = strtok(NULL, " ")
+	start_tcp_server()
+	receive_file_tcp()
+}
+	
+else if (!strcmp(command, "UDPSEND")){
+	filename = strtok(NULL, " ")
+	start_udp_server(filename)
+	receive_file_udp()
+}
+
+else {
+    printf("unknown command...\n");
+}
